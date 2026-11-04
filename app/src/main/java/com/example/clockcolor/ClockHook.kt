@@ -1,42 +1,111 @@
 package com.example.clockcolor
 
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.lang.reflect.Modifier
 
 class ClockHook : IXposedHookLoadPackage {
 
     private val prefs by lazy { XSharedPreferences(BuildConfigLike.PKG, BuildConfigLike.PREFS) }
-    private val seen = HashSet<String>()
+    private val dumped = HashSet<String>()
+    private val drawHooked = HashSet<String>()
 
     private fun color(): Int {
         prefs.reload()
-        val ok = prefs.file.canRead()
-        val en = prefs.getBoolean("enabled", false)
-        val c = prefs.getInt("color", 0)
-        XposedBridge.log("ClockColor: prefs readable=$ok enabled=$en color=$c")
-        return if (en) c else 0
+        return if (prefs.getBoolean("enabled", false)) prefs.getInt("color", 0) else 0
+    }
+
+    private fun log(s: String) = XposedBridge.log("ClockColor: $s")
+
+    // Логируем структуру класса (один раз на класс)
+    private fun dump(v: View) {
+        val name = v.javaClass.name
+        if (!dumped.add(name)) return
+        var k: Class<*>? = v.javaClass
+        while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
+            val fields = k.declaredFields.filter { !Modifier.isStatic(it.modifiers) }
+                .joinToString(", ") { "${it.name}:${it.type.simpleName}" }
+            val methods = k.declaredMethods.joinToString(", ") { it.name }
+            log("DUMP class=${k.name}")
+            fields.chunked(1500).forEach { log("DUMP fields: $it") }
+            methods.chunked(1500).forEach { log("DUMP methods: $it") }
+            k = k.superclass
+        }
+        if (v is ViewGroup) {
+            val kids = (0 until v.childCount).joinToString(", ") { v.getChildAt(it).javaClass.name }
+            log("DUMP children(${v.childCount}): $kids")
+        }
+    }
+
+    private fun recolorPaints(v: View, c: Int) {
+        var k: Class<*>? = v.javaClass
+        while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
+            for (f in k.declaredFields) {
+                if (Modifier.isStatic(f.modifiers)) continue
+                runCatching {
+                    f.isAccessible = true
+                    when (val o = f.get(v)) {
+                        is Paint -> o.color = c
+                        is Array<*> -> o.forEach { if (it is Paint) it.color = c }
+                        is Collection<*> -> o.forEach { if (it is Paint) it.color = c }
+                    }
+                }
+            }
+            k = k.superclass
+        }
+    }
+
+    private fun recolorAll(v: View, c: Int) {
+        if (v is TextView) v.setTextColor(c)
+        recolorPaints(v, c)
+        if (v is ViewGroup) for (i in 0 until v.childCount) recolorAll(v.getChildAt(i), c)
+    }
+
+    // Хук onDraw во всех классах цепочки, где он объявлен
+    private fun hookDraw(v: View) {
+        var k: Class<*>? = v.javaClass
+        while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
+            if (drawHooked.add(k.name)) {
+                runCatching {
+                    val m = k.getDeclaredMethod("onDraw", Canvas::class.java)
+                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(p: MethodHookParam) {
+                            val c = color()
+                            if (c != 0) recolorPaints(p.thisObject as View, c)
+                        }
+                    })
+                    log("onDraw hooked in ${k.name}")
+                }
+            }
+            k = k.superclass
+        }
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName != "com.android.systemui") return
-        XposedBridge.log("ClockColor: загружен в SystemUI")
+        log("loaded in SystemUI")
 
         XposedBridge.hookAllMethods(View::class.java, "dispatchAttachedToWindow", object : XC_MethodHook() {
             override fun afterHookedMethod(p: MethodHookParam) {
                 val v = p.thisObject as View
                 val name = v.javaClass.name
                 if (!name.contains("clock", ignoreCase = true)) return
-
-                if (seen.add(name)) {
-                    XposedBridge.log("ClockColor: найден view $name, super=${v.javaClass.superclass?.name}, isTextView=${v is TextView}")
-                }
                 val c = color()
-                if (c != 0 && v is TextView) v.setTextColor(c)
+                log("clock view $name color=$c isTextView=${v is TextView}")
+                dump(v)
+                if (v !is TextView) hookDraw(v)
+                if (c != 0) {
+                    recolorAll(v, c)
+                    v.invalidate()
+                }
             }
         })
     }
