@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.example.clockcolor.app-mergeDebugResources-2:/values/values.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\hlebak\\Desktop\\ClockColor\\app\\src\\main\\res\\values\\arrays.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "4",
+                        "endColumns": "19",
+                        "endOffsets": "151"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,69 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.clockcolor"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="29"
+9        android:targetSdkVersion="34" />
+10
+11    <application
+11-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:3:5-19:19
+12        android:debuggable="true"
+13        android:extractNativeLibs="false"
+14        android:label="Clock Color"
+14-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:4:9-36
+15        android:theme="@android:style/Theme.DeviceDefault.DayNight" >
+15-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:5:9-68
+16        <meta-data
+16-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:7:9-70
+17            android:name="xposedmodule"
+17-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:7:20-47
+18            android:value="true" />
+18-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:7:48-68
+19        <meta-data
+19-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:8:9-102
+20            android:name="xposeddescription"
+20-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:8:20-52
+21            android:value="Цвет часов на экране блокировки" />
+21-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:8:53-100
+22        <meta-data
+22-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:9:9-72
+23            android:name="xposedminversion"
+23-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:9:20-51
+24            android:value="93" />
+24-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:9:52-70
+25        <meta-data
+25-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:10:9-87
+26            android:name="xposedscope"
+26-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:10:20-46
+27            android:resource="@array/xposed_scope" />
+27-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:10:47-85
+28        <meta-data
+28-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:11:9-75
+29            android:name="xposedsharedprefs"
+29-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:11:20-52
+30            android:value="true" />
+30-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:11:53-73
+31
+32        <activity
+32-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:13:9-18:20
+33            android:name="com.example.clockcolor.MainActivity"
+33-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:13:19-47
+34            android:exported="true" >
+34-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:13:48-71
+35            <intent-filter>
+35-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:14:13-17:29
+36                <action android:name="android.intent.action.MAIN" />
+36-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:15:17-68
+36-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:15:25-66
+37
+38                <category android:name="android.intent.category.LAUNCHER" />
+38-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:16:17-76
+38-->C:\Users\hlebak\Desktop\ClockColor\app\src\main\AndroidManifest.xml:16:27-74
+39            </intent-filter>
+40        </activity>
+41    </application>
+42
+43</manifest>
