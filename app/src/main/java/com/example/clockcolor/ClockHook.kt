@@ -73,19 +73,20 @@ class ClockHook : IXposedHookLoadPackage {
     private fun hookDraw(v: View) {
         var k: Class<*>? = v.javaClass
         while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
-            if (drawHooked.add(k.name)) {
+            val cls: Class<*> = k
+            if (drawHooked.add(cls.name)) {
                 runCatching {
-                    val m = k.getDeclaredMethod("onDraw", Canvas::class.java)
+                    val m = cls.getDeclaredMethod("onDraw", Canvas::class.java)
                     XposedBridge.hookMethod(m, object : XC_MethodHook() {
                         override fun beforeHookedMethod(p: MethodHookParam) {
                             val c = color()
                             if (c != 0) recolorPaints(p.thisObject as View, c)
                         }
                     })
-                    log("onDraw hooked in ${k.name}")
+                    log("onDraw hooked in ${cls.name}")
                 }
             }
-            k = k.superclass
+            k = cls.superclass
         }
     }
 
