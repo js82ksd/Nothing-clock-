@@ -16,11 +16,13 @@ class ClockHook : IXposedHookLoadPackage {
 
     private val prefs by lazy { XSharedPreferences(BuildConfigLike.PKG, BuildConfigLike.PREFS) }
     private val hooked = HashSet<String>()
+    private val dumped = HashSet<String>()
+    private val interceptLogged = HashSet<String>()
     private var cached = 0
     private var cachedAt = 0L
-    private var activePaint: Paint? = null
+    private var activePaints: List<Paint> = emptyList()
+    private var activeName = ""
     private var depth = 0
-    private var logged = false
 
     private fun log(s: String) = XposedBridge.log("ClockColor: $s")
 
@@ -35,22 +37,21 @@ class ClockHook : IXposedHookLoadPackage {
         return cached
     }
 
-    private fun paintOf(v: View): Paint? {
-        var k: Class<*>? = v.javaClass
-        while (k != null && k != View::class.java && k != Any::class.java) {
-            val cls: Class<*> = k
-            val f = runCatching { cls.getDeclaredField("paint") }.getOrNull()
-            if (f != null) {
-                f.isAccessible = true
-                val o = f.get(v)
-                if (o is Paint) return o
-            }
-            k = cls.superclass
+    // Часы это view с "clock" в имени класса или внутри такого view
+    private fun isClockish(v: View): Boolean {
+        var cur: Any? = v
+        var i = 0
+        while (cur is View && i < 8) {
+            if (cur.javaClass.name.contains("clock", ignoreCase = true)) return true
+            cur = cur.parent
+            i++
         }
-        return null
+        return false
     }
 
-    private fun recolorPaints(v: View, c: Int) {
+    // Все Paint из полей view (включая массивы и списки)
+    private fun paintsOf(v: View): List<Paint> {
+        val out = ArrayList<Paint>()
         var k: Class<*>? = v.javaClass
         while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
             val cls: Class<*> = k
@@ -58,12 +59,21 @@ class ClockHook : IXposedHookLoadPackage {
                 if (Modifier.isStatic(f.modifiers)) continue
                 runCatching {
                     f.isAccessible = true
-                    val o = f.get(v)
-                    if (o is Paint) o.color = c
+                    when (val o = f.get(v)) {
+                        is Paint -> out.add(o)
+                        is Array<*> -> o.forEach { if (it is Paint) out.add(it) }
+                        is Collection<*> -> o.forEach { if (it is Paint) out.add(it) }
+                        else -> Unit
+                    }
                 }
             }
             k = cls.superclass
         }
+        return out
+    }
+
+    private fun recolorPaints(v: View, c: Int) {
+        paintsOf(v).forEach { it.color = c }
     }
 
     private fun recolorAll(v: View, c: Int) {
@@ -72,14 +82,40 @@ class ClockHook : IXposedHookLoadPackage {
         if (v is ViewGroup) for (i in 0 until v.childCount) recolorAll(v.getChildAt(i), c)
     }
 
-    // Вокруг drawClock/onDraw: помечаем Paint часов как "активный"
+    // Структура класса в лог, один раз на класс
+    private fun dump(v: View) {
+        val name = v.javaClass.name
+        if (!dumped.add(name)) return
+        var k: Class<*>? = v.javaClass
+        while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
+            val cls: Class<*> = k
+            if (!cls.name.startsWith("android.")) {
+                val fields = cls.declaredFields.filter { !Modifier.isStatic(it.modifiers) }
+                    .joinToString(", ") { "${it.name}:${it.type.simpleName}" }
+                val methods = cls.declaredMethods.joinToString(", ") { it.name }
+                log("DUMP class=${cls.name}")
+                fields.chunked(1500).forEach { log("DUMP fields: $it") }
+                methods.chunked(1500).forEach { log("DUMP methods: $it") }
+            }
+            k = cls.superclass
+        }
+        if (v is ViewGroup) {
+            val kids = (0 until v.childCount).joinToString(", ") { v.getChildAt(it).javaClass.name }
+            log("DUMP children(${v.childCount}) of $name: $kids")
+        }
+    }
+
+    // Вокруг drawClock/onDraw: помечаем Paint часов как "активные"
     private val drawHook = object : XC_MethodHook() {
         override fun beforeHookedMethod(p: MethodHookParam) {
             val v = p.thisObject as? View ?: return
             val c = color()
             if (c == 0) return
             recolorPaints(v, c)
-            if (depth == 0) activePaint = paintOf(v)
+            if (depth == 0) {
+                activePaints = paintsOf(v)
+                activeName = v.javaClass.name
+            }
             depth++
             p.setObjectExtra("on", true)
         }
@@ -89,7 +125,7 @@ class ClockHook : IXposedHookLoadPackage {
                 depth--
                 if (depth <= 0) {
                     depth = 0
-                    activePaint = null
+                    activePaints = emptyList()
                 }
             }
         }
@@ -118,10 +154,10 @@ class ClockHook : IXposedHookLoadPackage {
         var k: Class<*>? = v.javaClass
         while (k != null && k != View::class.java && k != ViewGroup::class.java && k != Any::class.java) {
             val cls: Class<*> = k
-            if (hooked.add(cls.name)) {
+            if (!cls.name.startsWith("android.") && hooked.add(cls.name)) {
                 for (m in cls.declaredMethods) {
                     if (Modifier.isAbstract(m.modifiers)) continue
-                    if (m.name == "onDraw" || m.name == "drawClock") {
+                    if (m.name == "onDraw" || m.name == "drawClock" || m.name == "dispatchDraw") {
                         runCatching {
                             XposedBridge.hookMethod(m, drawHook)
                             log("hooked ${cls.simpleName}.${m.name}")
@@ -155,16 +191,14 @@ class ClockHook : IXposedHookLoadPackage {
                 Paint::class.java, "setColor", Int::class.javaPrimitiveType,
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(p: MethodHookParam) {
-                        val ap = activePaint ?: return
-                        if (p.thisObject !== ap) return
+                        val list = activePaints
+                        if (list.isEmpty()) return
+                        if (list.none { it === p.thisObject }) return
                         val c = cached
                         if (c == 0) return
                         val orig = p.args[0] as Int
                         p.args[0] = (orig and 0xFF000000.toInt()) or (c and 0x00FFFFFF)
-                        if (!logged) {
-                            logged = true
-                            log("intercepted Paint.setColor in clock draw")
-                        }
+                        if (interceptLogged.add(activeName)) log("intercepted Paint.setColor in $activeName")
                     }
                 }
             )
@@ -173,10 +207,12 @@ class ClockHook : IXposedHookLoadPackage {
         XposedBridge.hookAllMethods(View::class.java, "dispatchAttachedToWindow", object : XC_MethodHook() {
             override fun afterHookedMethod(p: MethodHookParam) {
                 val v = p.thisObject as View
+                if (!isClockish(v)) return
                 val name = v.javaClass.name
-                if (!name.contains("clock", ignoreCase = true)) return
+                if (name.startsWith("android.")) return
                 val c = color()
-                log("clock view $name color=$c")
+                log("clock view $name color=$c isTextView=${v is TextView}")
+                dump(v)
                 if (v is TextView) hookTextClock(v) else hookClockView(v)
                 if (c != 0) {
                     recolorAll(v, c)
