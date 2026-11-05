@@ -92,7 +92,7 @@ adb logcat | findstr ClockColor
 
 ## Лицензия
 
-Выберите лицензию (например, MIT) и добавьте файл `LICENSE`.
+ `LICENSE`.
 
 ---
 
