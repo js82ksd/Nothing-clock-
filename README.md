@@ -53,13 +53,6 @@ Xposed-модуль (LSPosed / Vector) для смены цвета часов �
 
 Настройки передаются из приложения в SystemUI через `XSharedPreferences` (поддерживается LSPosed / Vector).
 
-## Сборка
-
-**Android Studio:** откройте папку проекта, дождитесь синхронизации Gradle и выберите Build → Build APK(s).
-APK будет в `app/build/outputs/apk/debug/app-debug.apk`.
-
-**GitHub Actions:** при каждом пуше workflow `.github/workflows/build.yml` собирает APK и выкладывает его артефактом `ClockColor-apk` (вкладка [Actions](../../actions)).
-
 ## Решение проблем
 
 Смотрите логи (на ПК с adb):
